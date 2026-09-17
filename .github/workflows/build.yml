@@ -1,0 +1,57 @@
+name: Build iOS IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Unzip Project if Needed
+        run: |
+          # ค้นหาและแตกไฟล์ .zip อัตโนมัติหากมีไฟล์ zip ใน repo
+          ZIP_FILE=$(find . -maxdepth 1 -name "*.zip" | head -n 1)
+          if [ -n "$ZIP_FILE" ]; then
+            echo "Unzipping $ZIP_FILE..."
+            unzip -o "$ZIP_FILE"
+          fi
+
+      - name: Build Unsigned IPA
+        run: |
+          # 1. ค้นหาตำแหน่งไฟล์ .xcodeproj
+          PROJ_PATH=$(find . -name "*.xcodeproj" | head -n 1)
+          echo "Found Project at: $PROJ_PATH"
+
+          if [ -z "$PROJ_PATH" ]; then
+            echo "Error: Could not find .xcodeproj file!"
+            exit 1
+          fi
+
+          # 2. ค้นหาชื่อ Scheme แรกของโปรเจกต์ให้อัตโนมัติ
+          SCHEME=$(xcodebuild -list -project "$PROJ_PATH" | grep -A 10 "Schemes:" | tail -n +2 | xargs | awk '{print $1}')
+          echo "Using Scheme: $SCHEME"
+
+          # 3. สั่ง Archive โปรเจกต์ (แบบ Unsigned)
+          xcodebuild archive \
+            -project "$PROJ_PATH" \
+            -scheme "$SCHEME" \
+            -archivePath ./build/ThreeOneOSFive.xcarchive \
+            -configuration Release \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+          # 4. แพ็กแอปเป็นไฟล์ .ipa
+          mkdir -p ./build/Payload
+          cp -r ./build/ThreeOneOSFive.xcarchive/Products/Applications/*.app ./build/Payload/
+          cd ./build
+          zip -r ThreeOneOSFive.ipa Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ThreeOneOSFive-IPA
+          path: build/ThreeOneOSFive.ipa
