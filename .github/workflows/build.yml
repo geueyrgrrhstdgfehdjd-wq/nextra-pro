@@ -10,31 +10,32 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Unzip Project if Needed
+      - name: Unzip All Zip Files
         run: |
-          # ค้นหาและแตกไฟล์ .zip อัตโนมัติหากมีไฟล์ zip ใน repo
-          ZIP_FILE=$(find . -maxdepth 1 -name "*.zip" | head -n 1)
-          if [ -n "$ZIP_FILE" ]; then
-            echo "Unzipping $ZIP_FILE..."
-            unzip -o "$ZIP_FILE"
-          fi
+          # แตกไฟล์ ZIP ทุกไฟล์ที่อยู่ใน Repo
+          find . -name "*.zip" -exec unzip -o {} \;
 
       - name: Build Unsigned IPA
         run: |
-          # 1. ค้นหาตำแหน่งไฟล์ .xcodeproj
+          # 1. ค้นหาไฟล์ .xcodeproj
           PROJ_PATH=$(find . -name "*.xcodeproj" | head -n 1)
-          echo "Found Project at: $PROJ_PATH"
+          echo "Found Project: $PROJ_PATH"
 
           if [ -z "$PROJ_PATH" ]; then
-            echo "Error: Could not find .xcodeproj file!"
+            echo "ERROR: File .xcodeproj not found in repository!"
             exit 1
           fi
 
-          # 2. ค้นหาชื่อ Scheme แรกของโปรเจกต์ให้อัตโนมัติ
-          SCHEME=$(xcodebuild -list -project "$PROJ_PATH" | grep -A 10 "Schemes:" | tail -n +2 | xargs | awk '{print $1}')
+          # 2. ค้นหา Scheme อัตโนมัติ
+          SCHEME=$(xcodebuild -list -project "$PROJ_PATH" | awk '/Schemes:/{flag=1; next} /^[[:space:]]*$/{flag=0} flag' | xargs | awk '{print $1}')
           echo "Using Scheme: $SCHEME"
 
-          # 3. สั่ง Archive โปรเจกต์ (แบบ Unsigned)
+          if [ -z "$SCHEME" ]; then
+            echo "ERROR: Scheme not found!"
+            exit 1
+          fi
+
+          # 3. สั่ง Build Archive
           xcodebuild archive \
             -project "$PROJ_PATH" \
             -scheme "$SCHEME" \
@@ -44,7 +45,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
-          # 4. แพ็กแอปเป็นไฟล์ .ipa
+          # 4. แพ็กไฟล์ IPA
           mkdir -p ./build/Payload
           cp -r ./build/ThreeOneOSFive.xcarchive/Products/Applications/*.app ./build/Payload/
           cd ./build
