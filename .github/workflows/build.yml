@@ -14,7 +14,7 @@ jobs:
         run: |
           find . -name "*.zip" -exec unzip -o -q {} \;
 
-      - name: Build Unsigned App & Extract Real Error
+      - name: Build Unsigned App & Create IPA
         run: |
           PROJ_PATH=$(find . -name "*.xcodeproj" | head -n 1)
           echo "Found Project: $PROJ_PATH"
@@ -26,40 +26,34 @@ jobs:
           rm -rf ~/Library/Developer/Xcode/DerivedData
           rm -rf ./build_output
 
-          # สั่งบิลด์พร้อมบันทึก Log ลงไฟล์ xcodebuild.log
-          set +e
+          # เพิ่ม IPHONEOS_DEPLOYMENT_TARGET=17.0 เพื่อปลดล็อค API ของ iOS 17
           xcodebuild build \
             -project "$PROJ_PATH" \
             -scheme "$SCHEME_NAME" \
             -sdk iphoneos \
             -configuration Release \
             -derivedDataPath ./build_output \
+            IPHONEOS_DEPLOYMENT_TARGET=17.0 \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=YES \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES > xcodebuild.log 2>&1
-          
-          BUILD_STATUS=$?
-
-          if [ $BUILD_STATUS -ne 0 ]; then
-            echo "=========================================="
-            echo "❌ BUILD FAILED! REAL ERRORS FOUND BELOW:"
-            echo "=========================================="
-            # กรองเอาเฉพาะบรรทัดที่เป็น error จริงๆ มาแสดงผล
-            grep -i "error:" xcodebuild.log | tail -n 25
-            echo "=========================================="
-            exit $BUILD_STATUS
-          fi
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
 
           mkdir -p ./build/Payload
           APP_PATH=$(find ./build_output/Build/Products/Release-iphoneos -name "*.app" | head -n 1)
+          echo "Found App: $APP_PATH"
+
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: Could not find .app directory"
+            exit 1
+          fi
+
           cp -r "$APP_PATH" ./build/Payload/
           cd ./build
           zip -r -q ThreeOneOSFive.ipa Payload
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
-        if: success()
         with:
           name: ThreeOneOSFive-IPA
           path: build/ThreeOneOSFive.ipa
