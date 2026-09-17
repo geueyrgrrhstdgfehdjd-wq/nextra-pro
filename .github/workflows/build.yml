@@ -12,40 +12,27 @@ jobs:
 
       - name: Unzip All Zip Files
         run: |
-          # แตกไฟล์ ZIP ทุกไฟล์ที่อยู่ใน Repo
           find . -name "*.zip" -exec unzip -o {} \;
 
       - name: Build Unsigned IPA
         run: |
-          # 1. ค้นหาไฟล์ .xcodeproj
           PROJ_PATH=$(find . -name "*.xcodeproj" | head -n 1)
           echo "Found Project: $PROJ_PATH"
 
-          if [ -z "$PROJ_PATH" ]; then
-            echo "ERROR: File .xcodeproj not found in repository!"
-            exit 1
-          fi
-
-          # 2. ค้นหา Scheme อัตโนมัติ
-          SCHEME=$(xcodebuild -list -project "$PROJ_PATH" | awk '/Schemes:/{flag=1; next} /^[[:space:]]*$/{flag=0} flag' | xargs | awk '{print $1}')
-          echo "Using Scheme: $SCHEME"
-
-          if [ -z "$SCHEME" ]; then
-            echo "ERROR: Scheme not found!"
-            exit 1
-          fi
-
-          # 3. สั่ง Build Archive
+          # สั่ง Archive โดยปิดระบบ Signing และการตรวจ Verification ทั้งหมด
           xcodebuild archive \
             -project "$PROJ_PATH" \
-            -scheme "$SCHEME" \
+            -scheme "3105" \
+            -sdk iphoneos \
             -archivePath ./build/ThreeOneOSFive.xcarchive \
             -configuration Release \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_ENTITLEMENTS="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
 
-          # 4. แพ็กไฟล์ IPA
+          # สร้างโฟลเดอร์ Payload และบีบอัดเป็น IPA
           mkdir -p ./build/Payload
           cp -r ./build/ThreeOneOSFive.xcarchive/Products/Applications/*.app ./build/Payload/
           cd ./build
