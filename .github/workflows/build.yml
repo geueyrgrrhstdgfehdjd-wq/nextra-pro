@@ -19,11 +19,14 @@ jobs:
           PROJ_PATH=$(find . -name "*.xcodeproj" | head -n 1)
           echo "Found Project: $PROJ_PATH"
 
-          # สั่ง Archive โดยปิดระบบ Signing และการตรวจ Verification ทั้งหมด
+          # ล้างแคชการบิลด์เก่า
+          rm -rf ~/Library/Developer/Xcode/DerivedData
+
+          # สั่ง Archive โดยระบุ Destination เป็น generic/platform=iOS
           xcodebuild archive \
             -project "$PROJ_PATH" \
             -scheme "3105" \
-            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             -archivePath ./build/ThreeOneOSFive.xcarchive \
             -configuration Release \
             CODE_SIGN_IDENTITY="" \
@@ -32,7 +35,7 @@ jobs:
             CODE_SIGN_ENTITLEMENTS="" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES
 
-          # สร้างโฟลเดอร์ Payload และบีบอัดเป็น IPA
+          # บรรจุไฟล์ลง Payload และสร้าง .ipa
           mkdir -p ./build/Payload
           cp -r ./build/ThreeOneOSFive.xcarchive/Products/Applications/*.app ./build/Payload/
           cd ./build
