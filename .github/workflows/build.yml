@@ -14,52 +14,52 @@ jobs:
         run: |
           find . -name "*.zip" -exec unzip -o -q {} \;
 
-      - name: Clean Xcode Cache & Build Unsigned App
+      - name: Build Unsigned App & Extract Real Error
         run: |
           PROJ_PATH=$(find . -name "*.xcodeproj" | head -n 1)
           echo "Found Project: $PROJ_PATH"
 
           SCHEME_NAME=$(xcodebuild -list -project "$PROJ_PATH" | grep -A 10 "Schemes:" | tail -n +2 | xargs | awk '{print $1}')
-          echo "Auto-detected Scheme: $SCHEME_NAME"
+          if [ -z "$SCHEME_NAME" ]; then SCHEME_NAME="3105"; fi
+          echo "Using Scheme: $SCHEME_NAME"
 
-          if [ -z "$SCHEME_NAME" ]; then
-            SCHEME_NAME="3105"
-          fi
-
-          # 1. เคลียร์ DerivedData ทั้งหมดเพื่อลบ ModuleCache ที่ตีกัน
           rm -rf ~/Library/Developer/Xcode/DerivedData
           rm -rf ./build_output
 
-          # 2. บิลด์โดยล็อค arm64 สำหรับ iphonesimulator และปิดการสร้าง Explicit Modules
+          # สั่งบิลด์พร้อมบันทึก Log ลงไฟล์ xcodebuild.log
+          set +e
           xcodebuild build \
             -project "$PROJ_PATH" \
             -scheme "$SCHEME_NAME" \
-            -sdk iphonesimulator \
-            -arch arm64 \
-            -configuration Debug \
+            -sdk iphoneos \
+            -configuration Release \
             -derivedDataPath ./build_output \
-            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            ONLY_ACTIVE_ARCH=YES \
-            SWIFT_EXPLICIT_MODULES=NO
+            CODE_SIGNING_ALLOWED=YES \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES > xcodebuild.log 2>&1
+          
+          BUILD_STATUS=$?
 
-          # 3. จัดการโครงสร้าง IPA
-          mkdir -p ./build/Payload
-          APP_PATH=$(find ./build_output -name "*.app" | head -n 1)
-          echo "Found App: $APP_PATH"
-
-          if [ -z "$APP_PATH" ]; then
-            echo "ERROR: Could not find .app directory"
-            exit 1
+          if [ $BUILD_STATUS -ne 0 ]; then
+            echo "=========================================="
+            echo "❌ BUILD FAILED! REAL ERRORS FOUND BELOW:"
+            echo "=========================================="
+            # กรองเอาเฉพาะบรรทัดที่เป็น error จริงๆ มาแสดงผล
+            grep -i "error:" xcodebuild.log | tail -n 25
+            echo "=========================================="
+            exit $BUILD_STATUS
           fi
 
+          mkdir -p ./build/Payload
+          APP_PATH=$(find ./build_output/Build/Products/Release-iphoneos -name "*.app" | head -n 1)
           cp -r "$APP_PATH" ./build/Payload/
           cd ./build
           zip -r -q ThreeOneOSFive.ipa Payload
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: ThreeOneOSFive-IPA
           path: build/ThreeOneOSFive.ipa
