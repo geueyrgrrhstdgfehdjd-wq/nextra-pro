@@ -19,25 +19,37 @@ jobs:
           PROJ_PATH=$(find . -name "*.xcodeproj" | head -n 1)
           echo "Found Project: $PROJ_PATH"
 
-          # สั่ง Build โดยปิดการตรวจ Signing ทุกรูปแบบ และปรับแต่งค่าข้าม Error Bridging Header
+          # 1. ดึงชื่อ Scheme แรกสุดที่พบในโปรเจกต์แบบ Dynamic
+          SCHEME_NAME=$(xcodebuild -list -project "$PROJ_PATH" | grep -A 10 "Schemes:" | tail -n +2 | xargs | awk '{print $1}')
+          echo "Auto-detected Scheme: $SCHEME_NAME"
+
+          if [ -z "$SCHEME_NAME" ]; then
+            SCHEME_NAME="3105"
+          fi
+
+          # 2. สั่ง Build สำหรับ Simulator เพื่อข้าม Code Signing 100%
           xcodebuild build \
             -project "$PROJ_PATH" \
-            -scheme "3105" \
-            -sdk iphoneos \
-            -configuration Release \
+            -scheme "$SCHEME_NAME" \
+            -sdk iphonesimulator \
+            -configuration Debug \
             -derivedDataPath ./build_output \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_ENTITLEMENTS="" \
             CODE_SIGNING_METHOD=none \
-            COMPILER_INDEX_STORE_ENABLE=NO \
-            GCC_PRECOMPILE_PREFIX_HEADER=NO
+            GCC_PRECOMPILE_PREFIX_HEADER=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO
 
-          # จัดทำโครงสร้าง Payload สำหรับ IPA
+          # 3. ค้นหาไฟล์ .app และบีบอัดเป็น IPA
           mkdir -p ./build/Payload
           APP_PATH=$(find ./build_output -name "*.app" | head -n 1)
           echo "Found App: $APP_PATH"
+
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: .app file not generated!"
+            exit 1
+          fi
 
           cp -r "$APP_PATH" ./build/Payload/
           cd ./build
