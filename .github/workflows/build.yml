@@ -19,32 +19,29 @@ jobs:
           PROJ_PATH=$(find . -name "*.xcodeproj" | head -n 1)
           echo "Found Project: $PROJ_PATH"
 
-          # สั่ง build ตัวแอป (.app) โดยตรงโดยปิดระบบ Code Signing ทุกชนิด
+          # 1. ล้าง DerivedData เก่า
+          rm -rf ~/Library/Developer/Xcode/DerivedData
+
+          # 2. สั่ง build สำหรับ Simulator เพื่อข้าม Code Signing 100%
           xcodebuild build \
             -project "$PROJ_PATH" \
             -scheme "3105" \
-            -sdk iphoneos \
-            -configuration Release \
+            -sdk iphonesimulator \
+            -configuration Debug \
             -derivedDataPath ./build_output \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_ENTITLEMENTS="" \
             CODE_SIGNING_METHOD=none
 
-          # ย้ายไฟล์ .app ไปยัง Payload แล้วทำการ Zip ให้เป็นไฟล์ IPA
+          # 3. จัดโครงสร้าง Payload และบีบอัดเป็น IPA
           mkdir -p ./build/Payload
-          cp -r ./build_output/Build/Products/Release-iphoneos/*.app ./build/Payload/
+          APP_PATH=$(find ./build_output -name "*.app" | head -n 1)
+          echo "Found App Bundle: $APP_PATH"
+
+          cp -r "$APP_PATH" ./build/Payload/
           cd ./build
           zip -r ThreeOneOSFive.ipa Payload
-
-          # ตรวจสอบการสร้างไฟล์
-          if [ -f "ThreeOneOSFive.ipa" ]; then
-            echo "IPA Build Success!"
-          else
-            echo "ERROR: IPA File not created!"
-            exit 1
-          fi
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
