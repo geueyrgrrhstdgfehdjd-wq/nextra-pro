@@ -19,7 +19,6 @@ jobs:
           PROJ_PATH=$(find . -name "*.xcodeproj" | head -n 1)
           echo "Found Project: $PROJ_PATH"
 
-          # 1. ค้นหา Scheme อัตโนมัติ
           SCHEME_NAME=$(xcodebuild -list -project "$PROJ_PATH" | grep -A 10 "Schemes:" | tail -n +2 | xargs | awk '{print $1}')
           echo "Auto-detected Scheme: $SCHEME_NAME"
 
@@ -27,26 +26,25 @@ jobs:
             SCHEME_NAME="3105"
           fi
 
-          # 2. บิลด์สำหรับ iphoneos (อุปกรณ์จริง) แบบปิด Signing ป้องกัน Exit Code 65
+          # บิลด์โดยใช้ Ad-hoc / Sign on Copy ป้องกัน Xcode Exit 65
           xcodebuild build \
             -project "$PROJ_PATH" \
             -scheme "$SCHEME_NAME" \
             -sdk iphoneos \
             -configuration Release \
             -derivedDataPath ./build_output \
-            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_ENTITLEMENTS="" \
-            CODE_SIGNING_METHOD=none \
-            ONLY_ACTIVE_ARCH=NO
+            CODE_SIGNING_ALLOWED=YES \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_ON_COPY=YES
 
-          # 3. จัดการโครงสร้าง Payload และบีบอัดเป็น IPA
           mkdir -p ./build/Payload
           APP_PATH=$(find ./build_output/Build/Products/Release-iphoneos -name "*.app" | head -n 1)
-          echo "Found App: $APP_PATH"
+          echo "Found App Bundle: $APP_PATH"
 
           if [ -z "$APP_PATH" ]; then
-            echo "ERROR: .app bundle was not found!"
+            echo "ERROR: Could not find .app directory"
             exit 1
           fi
 
