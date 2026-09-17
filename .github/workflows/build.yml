@@ -14,32 +14,37 @@ jobs:
         run: |
           find . -name "*.zip" -exec unzip -o {} \;
 
-      - name: Build Unsigned IPA
+      - name: Build Unsigned App & Create IPA
         run: |
           PROJ_PATH=$(find . -name "*.xcodeproj" | head -n 1)
           echo "Found Project: $PROJ_PATH"
 
-          # ล้างแคชการบิลด์เก่า
-          rm -rf ~/Library/Developer/Xcode/DerivedData
-
-          # สั่ง Archive โดยระบุ Destination เป็น generic/platform=iOS
-          xcodebuild archive \
+          # สั่ง build ตัวแอป (.app) โดยตรงโดยปิดระบบ Code Signing ทุกชนิด
+          xcodebuild build \
             -project "$PROJ_PATH" \
             -scheme "3105" \
-            -destination 'generic/platform=iOS' \
-            -archivePath ./build/ThreeOneOSFive.xcarchive \
+            -sdk iphoneos \
             -configuration Release \
+            -derivedDataPath ./build_output \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_ENTITLEMENTS="" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES
+            CODE_SIGNING_METHOD=none
 
-          # บรรจุไฟล์ลง Payload และสร้าง .ipa
+          # ย้ายไฟล์ .app ไปยัง Payload แล้วทำการ Zip ให้เป็นไฟล์ IPA
           mkdir -p ./build/Payload
-          cp -r ./build/ThreeOneOSFive.xcarchive/Products/Applications/*.app ./build/Payload/
+          cp -r ./build_output/Build/Products/Release-iphoneos/*.app ./build/Payload/
           cd ./build
           zip -r ThreeOneOSFive.ipa Payload
+
+          # ตรวจสอบการสร้างไฟล์
+          if [ -f "ThreeOneOSFive.ipa" ]; then
+            echo "IPA Build Success!"
+          else
+            echo "ERROR: IPA File not created!"
+            exit 1
+          fi
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
