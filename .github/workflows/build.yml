@@ -19,25 +19,25 @@ jobs:
           PROJ_PATH=$(find . -name "*.xcodeproj" | head -n 1)
           echo "Found Project: $PROJ_PATH"
 
-          # 1. ล้าง DerivedData เก่า
-          rm -rf ~/Library/Developer/Xcode/DerivedData
-
-          # 2. สั่ง build สำหรับ Simulator เพื่อข้าม Code Signing 100%
+          # สั่ง Build โดยปิดการตรวจ Signing ทุกรูปแบบ และปรับแต่งค่าข้าม Error Bridging Header
           xcodebuild build \
             -project "$PROJ_PATH" \
             -scheme "3105" \
-            -sdk iphonesimulator \
-            -configuration Debug \
+            -sdk iphoneos \
+            -configuration Release \
             -derivedDataPath ./build_output \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_METHOD=none
+            CODE_SIGN_ENTITLEMENTS="" \
+            CODE_SIGNING_METHOD=none \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            GCC_PRECOMPILE_PREFIX_HEADER=NO
 
-          # 3. จัดโครงสร้าง Payload และบีบอัดเป็น IPA
+          # จัดทำโครงสร้าง Payload สำหรับ IPA
           mkdir -p ./build/Payload
           APP_PATH=$(find ./build_output -name "*.app" | head -n 1)
-          echo "Found App Bundle: $APP_PATH"
+          echo "Found App: $APP_PATH"
 
           cp -r "$APP_PATH" ./build/Payload/
           cd ./build
