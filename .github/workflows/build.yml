@@ -26,22 +26,20 @@ jobs:
             SCHEME_NAME="3105"
           fi
 
-          # บิลด์โดยใช้ Ad-hoc / Sign on Copy ป้องกัน Xcode Exit 65
+          # บิลด์ผ่าน iphonesimulator เพื่อข้ามข้อบังคับ Code Signing ของ Xcode
           xcodebuild build \
             -project "$PROJ_PATH" \
             -scheme "$SCHEME_NAME" \
-            -sdk iphoneos \
-            -configuration Release \
+            -sdk iphonesimulator \
+            -configuration Debug \
             -derivedDataPath ./build_output \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=YES \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            CODE_SIGN_ON_COPY=YES
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO
 
+          # ค้นหาไฟล์ .app และสร้างโฟลเดอร์ Payload ทำเป็น .ipa
           mkdir -p ./build/Payload
-          APP_PATH=$(find ./build_output/Build/Products/Release-iphoneos -name "*.app" | head -n 1)
-          echo "Found App Bundle: $APP_PATH"
+          APP_PATH=$(find ./build_output/Build/Products/Debug-iphonesimulator -name "*.app" | head -n 1)
+          echo "Found App: $APP_PATH"
 
           if [ -z "$APP_PATH" ]; then
             echo "ERROR: Could not find .app directory"
