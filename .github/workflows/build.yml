@@ -16,17 +16,21 @@ jobs:
 
       - name: Build Unsigned App & Create IPA
         run: |
+          # ค้นหาโปรเจกต์ .xcodeproj ในโฟลเดอร์ UT
           PROJ_PATH=$(find . -name "*.xcodeproj" | head -n 1)
           echo "Found Project: $PROJ_PATH"
 
+          # ดึงชื่อ Scheme จากโปรเจกต์ UT
           SCHEME_NAME=$(xcodebuild -list -project "$PROJ_PATH" | grep -A 10 "Schemes:" | tail -n +2 | xargs | awk '{print $1}')
-          if [ -z "$SCHEME_NAME" ]; then SCHEME_NAME="3105"; fi
+          if [ -z "$SCHEME_NAME" ]; then SCHEME_NAME="UT"; fi
           echo "Using Scheme: $SCHEME_NAME"
 
+          # เคลียร์แคชและโฟลเดอร์ผลลัพธ์เก่า
           rm -rf ~/Library/Developer/Xcode/DerivedData
           rm -rf ./build_output
+          rm -rf ./build
 
-          # เพิ่ม IPHONEOS_DEPLOYMENT_TARGET=17.0 เพื่อปลดล็อค API ของ iOS 17
+          # บิลด์แอป iOS (Release / Unsigned)
           xcodebuild build \
             -project "$PROJ_PATH" \
             -scheme "$SCHEME_NAME" \
@@ -34,12 +38,11 @@ jobs:
             -configuration Release \
             -derivedDataPath ./build_output \
             IPHONEOS_DEPLOYMENT_TARGET=17.0 \
-            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=YES \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES
+            CODE_SIGNING_ALLOWED=NO
 
-          mkdir -p ./build/Payload
+          # ค้นหาไฟล์ .app ที่สร้างขึ้น
           APP_PATH=$(find ./build_output/Build/Products/Release-iphoneos -name "*.app" | head -n 1)
           echo "Found App: $APP_PATH"
 
@@ -48,12 +51,17 @@ jobs:
             exit 1
           fi
 
-          cp -r "$APP_PATH" ./build/Payload/
+          # จัดโครงสร้าง Payload สำหรับสร้างไฟล์ .ipa
+          mkdir -p ./build/Payload
+          cp -R "$APP_PATH" ./build/Payload/
+
+          # บีบอัดเป็นไฟล์ UT.ipa
           cd ./build
-          zip -r -q ThreeOneOSFive.ipa Payload
+          zip -r -q UT.ipa Payload
+          cd ..
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ThreeOneOSFive-IPA
-          path: build/ThreeOneOSFive.ipa
+          name: UT-IPA-Artifact
+          path: build/UT.ipa
