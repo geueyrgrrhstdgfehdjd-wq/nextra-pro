@@ -23,21 +23,20 @@ jobs:
           # 2. ลบแคชบิลด์เก่า
           rm -rf ./build_output ./build
 
-          # 3. บิลด์โดยกำหนด Deployment Target ให้สูงขึ้นเพื่อรองรับ API ใหม่
+          # 3. บิลด์แบบ Ad-hoc Sign (ใช้อักษร "-" บังคับให้ Xcode Sign แบบไม่ต้องใช้ Certificate)
           xcodebuild build \
             -project "$PROJ_PATH" \
             -scheme "3105" \
             -sdk iphoneos \
             -configuration Release \
             -derivedDataPath ./build_output \
-            IPHONEOS_DEPLOYMENT_TARGET=16.0 \
+            CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_ALLOWED=YES \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            COMPILER_INDEX_STORE_ENABLE=NO
+            DEVELOPMENT_TEAM=""
 
-          # 4. ค้นหาไฟล์ .app
+          # 4. ตรวจสอบการสร้าง .app
           APP_PATH=$(find ./build_output/Build/Products/Release-iphoneos -name "*.app" | head -n 1)
           if [ -z "$APP_PATH" ]; then
             echo "::error:: ไม่พบไฟล์ .app หลังจากการบิลด์"
@@ -45,7 +44,7 @@ jobs:
           fi
           echo "Found App: $APP_PATH"
 
-          # 5. สร้างโฟลเดอร์ Payload และ Zip เป็น IPA
+          # 5. รวมไฟล์เป็น IPA
           mkdir -p ./build/Payload
           cp -R "$APP_PATH" ./build/Payload/
           cd ./build
