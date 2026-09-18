@@ -14,10 +14,19 @@ jobs:
         run: |
           find . -name "*.zip" -exec unzip -o -q {} \;
 
-      - name: Patch Swift Code Automatically
+      - name: Force Patch Swift Files & Project
         run: |
-          find . -name "ContentView.swift" -exec perl -pi -e 's/private struct DashboardView/\@available\(iOS 15.0, \*\)\nprivate struct DashboardView/g' {} +
-          find . -name "DisplayIdentityAttribution.swift" -exec perl -pi -e 's/public struct DisplayIdentityAttribution/\@available\(iOS 15.0, \*\)\npublic struct DisplayIdentityAttribution/g' {} +
+          # 1. บังคับเปลี่ยน Deployment Target ในโปรเจกต์เป็น iOS 15.0 ทั้งหมด
+          find . -name "*.pbxproj" -exec sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*/IPHONEOS_DEPLOYMENT_TARGET = 15.0/g' {} +
+
+          # 2. ฉีด @available(iOS 15.0, *) ไว้บนสุดของทุกไฟล์ Swift อัตโนมัติเพื่อแก้ปัญหา Compile Error
+          find . -name "*.swift" -exec sh -c '
+            for file; do
+              if ! grep -q "@available(iOS 15.0, \*)" "$file"; then
+                echo "@available(iOS 15.0, *)\n$(cat "$file")" > "$file"
+              fi
+            done
+          ' sh {} +
 
       - name: Build Unsigned App & Create IPA
         run: |
@@ -26,7 +35,7 @@ jobs:
 
           rm -rf ./build_output ./build
 
-          # ใช้ Ad-hoc Code Sign (-) เพื่อให้ Xcode ยอมสร้าง Bundle ให้จบกระบวนการ
+          # บิลด์ iOS แบบ Ad-hoc Signature เพื่อให้จบ Bundle ได้สมบูรณ์
           xcodebuild build \
             -project "$PROJ_PATH" \
             -scheme "3105" \
@@ -42,11 +51,12 @@ jobs:
 
           APP_PATH=$(find ./build_output/Build/Products/Release-iphoneos -name "*.app" | head -n 1)
           if [ -z "$APP_PATH" ]; then
-            echo "::error:: ไม่พบไฟล์ .app"
+            echo "::error:: ไม่พบไฟล์ .app หลังจากการบิลด์"
             exit 1
           fi
           echo "Found App: $APP_PATH"
 
+          # รวมไฟล์เข้า Payload เพื่อสร้าง IPA
           mkdir -p ./build/Payload
           cp -R "$APP_PATH" ./build/Payload/
           cd ./build
