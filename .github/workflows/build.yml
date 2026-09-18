@@ -1,4 +1,4 @@
-name: Build iOS IPA
+name: Build Unsigned iOS IPA
 
 on:
   workflow_dispatch:
@@ -16,52 +16,49 @@ jobs:
 
       - name: Build Unsigned App & Create IPA
         run: |
-          # ค้นหาโปรเจกต์ .xcodeproj ในโฟลเดอร์ UT
+          # 1. ค้นหาไฟล์ .xcodeproj ในโปรเจกต์
           PROJ_PATH=$(find . -name "*.xcodeproj" | head -n 1)
           echo "Found Project: $PROJ_PATH"
 
-          # ดึงชื่อ Scheme จากโปรเจกต์ UT
+          # 2. ค้นหาชื่อ Scheme แรกที่พบ
           SCHEME_NAME=$(xcodebuild -list -project "$PROJ_PATH" | grep -A 10 "Schemes:" | tail -n +2 | xargs | awk '{print $1}')
           if [ -z "$SCHEME_NAME" ]; then SCHEME_NAME="UT"; fi
           echo "Using Scheme: $SCHEME_NAME"
 
-          # เคลียร์แคชและโฟลเดอร์ผลลัพธ์เก่า
-          rm -rf ~/Library/Developer/Xcode/DerivedData
-          rm -rf ./build_output
-          rm -rf ./build
+          # 3. เคลียร์โฟลเดอร์ผลลัพธ์เก่า
+          rm -rf ./build_output ./build
 
-          # บิลด์แอป iOS (Release / Unsigned)
+          # 4. คำสั่งบิลด์ iOS แบบข้ามระบบ Code Signing ทั้งหมด
           xcodebuild build \
             -project "$PROJ_PATH" \
             -scheme "$SCHEME_NAME" \
             -sdk iphoneos \
             -configuration Release \
             -derivedDataPath ./build_output \
-            IPHONEOS_DEPLOYMENT_TARGET=17.0 \
-            CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            COMPILER_INDEX_STORE_ENABLE=NO
 
-          # ค้นหาไฟล์ .app ที่สร้างขึ้น
+          # 5. ตรวจสอบว่าบิลด์ได้ไฟล์ .app หรือไม่
           APP_PATH=$(find ./build_output/Build/Products/Release-iphoneos -name "*.app" | head -n 1)
-          echo "Found App: $APP_PATH"
-
           if [ -z "$APP_PATH" ]; then
-            echo "ERROR: Could not find .app directory"
+            echo "::error:: ไม่พบไฟล์ .app หลังจากการบิลด์"
             exit 1
           fi
+          echo "Found App: $APP_PATH"
 
-          # จัดโครงสร้าง Payload สำหรับสร้างไฟล์ .ipa
+          # 6. แพ็กไฟล์ .app เป็น Payload/ แล้วบีบอัดเป็น UT.ipa
           mkdir -p ./build/Payload
           cp -R "$APP_PATH" ./build/Payload/
-
-          # บีบอัดเป็นไฟล์ UT.ipa
           cd ./build
           zip -r -q UT.ipa Payload
           cd ..
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: UT-IPA-Artifact
           path: build/UT.ipa
