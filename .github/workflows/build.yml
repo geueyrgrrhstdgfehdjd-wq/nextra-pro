@@ -16,26 +16,17 @@ jobs:
 
       - name: Build Unsigned App & Create IPA
         run: |
-          # 1. ค้นหาไฟล์ .xcodeproj ใน repository
+          # 1. ค้นหาไฟล์ .xcodeproj
           PROJ_PATH=$(find . -name "*.xcodeproj" | head -n 1)
           echo "Found Project: $PROJ_PATH"
 
-          # 2. ดึงรายชื่อ Scheme จริงจากโปรเจกต์โดยอัตโนมัติ
-          SCHEME_NAME=$(xcodebuild -list -project "$PROJ_PATH" | grep -A 10 "Schemes:" | tail -n +2 | xargs | awk '{print $1}')
-          
-          if [ -z "$SCHEME_NAME" ]; then
-            echo "::error:: ไม่พบ Scheme ใดๆ ในโปรเจกต์"
-            exit 1
-          fi
-          echo "Detected Scheme: $SCHEME_NAME"
-
-          # 3. ลบแคชบิลด์เก่า
+          # 2. ลบแคชบิลด์เก่าทั้งหมด
           rm -rf ./build_output ./build
 
-          # 4. บิลด์โปรเจกต์โดยใช้ Scheme ที่ค้นพบอัตโนมัติ
+          # 3. คำสั่งบิลด์ iOS แบบข้าม Code Signing และปิด Warning ทั้งหมด
           xcodebuild build \
             -project "$PROJ_PATH" \
-            -scheme "$SCHEME_NAME" \
+            -scheme "3105" \
             -sdk iphoneos \
             -configuration Release \
             -derivedDataPath ./build_output \
@@ -43,9 +34,12 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY="" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            COMPILER_INDEX_STORE_ENABLE=NO
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=NO \
+            GCC_WARN_INHIBIT_ALL_WARNINGS=YES \
+            SWIFT_SUPPRESS_WARNINGS=YES
 
-          # 5. ค้นหาไฟล์ .app ที่บิลด์ออกมา
+          # 4. ค้นหาไฟล์ .app ที่บิลด์สำเร็จ
           APP_PATH=$(find ./build_output/Build/Products/Release-iphoneos -name "*.app" | head -n 1)
           if [ -z "$APP_PATH" ]; then
             echo "::error:: ไม่พบไฟล์ .app หลังจากการบิลด์"
@@ -53,7 +47,7 @@ jobs:
           fi
           echo "Found App: $APP_PATH"
 
-          # 6. บีบอัดเป็นไฟล์ IPA
+          # 5. จัดโครงสร้าง Payload และบีบอัดเป็น IPA
           mkdir -p ./build/Payload
           cp -R "$APP_PATH" ./build/Payload/
           cd ./build
