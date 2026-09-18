@@ -20,26 +20,24 @@ jobs:
           PROJ_PATH=$(find . -name "*.xcodeproj" | head -n 1)
           echo "Found Project: $PROJ_PATH"
 
-          # 2. ลบแคชบิลด์เก่าทั้งหมด
+          # 2. ลบแคชบิลด์เก่า
           rm -rf ./build_output ./build
 
-          # 3. คำสั่งบิลด์ iOS แบบข้าม Code Signing และปิด Warning ทั้งหมด
+          # 3. บิลด์โดยกำหนด Deployment Target ให้สูงขึ้นเพื่อรองรับ API ใหม่
           xcodebuild build \
             -project "$PROJ_PATH" \
             -scheme "3105" \
             -sdk iphoneos \
             -configuration Release \
             -derivedDataPath ./build_output \
+            IPHONEOS_DEPLOYMENT_TARGET=16.0 \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY="" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            COMPILER_INDEX_STORE_ENABLE=NO \
-            SWIFT_TREAT_WARNINGS_AS_ERRORS=NO \
-            GCC_WARN_INHIBIT_ALL_WARNINGS=YES \
-            SWIFT_SUPPRESS_WARNINGS=YES
+            COMPILER_INDEX_STORE_ENABLE=NO
 
-          # 4. ค้นหาไฟล์ .app ที่บิลด์สำเร็จ
+          # 4. ค้นหาไฟล์ .app
           APP_PATH=$(find ./build_output/Build/Products/Release-iphoneos -name "*.app" | head -n 1)
           if [ -z "$APP_PATH" ]; then
             echo "::error:: ไม่พบไฟล์ .app หลังจากการบิลด์"
@@ -47,7 +45,7 @@ jobs:
           fi
           echo "Found App: $APP_PATH"
 
-          # 5. จัดโครงสร้าง Payload และบีบอัดเป็น IPA
+          # 5. สร้างโฟลเดอร์ Payload และ Zip เป็น IPA
           mkdir -p ./build/Payload
           cp -R "$APP_PATH" ./build/Payload/
           cd ./build
