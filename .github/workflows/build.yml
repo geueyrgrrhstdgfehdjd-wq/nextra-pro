@@ -14,14 +14,24 @@ jobs:
         run: |
           find . -name "*.zip" -exec unzip -o -q {} \;
 
+      - name: Patch Swift Code Automatically
+        run: |
+          # 1. ฉีด @available ให้กับ ContentView.swift เพื่อแก้ Swift Compile Error
+          find . -name "ContentView.swift" -exec perl -pi -e 's/private struct DashboardView/\@available\(iOS 15.0, \*\)\nprivate struct DashboardView/g' {} +
+
+          # 2. ฉีด @available และแก้ API Deprecation ใน DisplayIdentityAttribution.swift
+          find . -name "DisplayIdentityAttribution.swift" -exec perl -pi -e 's/public struct DisplayIdentityAttribution/\@available\(iOS 15.0, \*\)\npublic struct DisplayIdentityAttribution/g' {} +
+
       - name: Build Unsigned App & Create IPA
         run: |
+          # ค้นหาไฟล์ .xcodeproj
           PROJ_PATH=$(find . -name "*.xcodeproj" | head -n 1)
           echo "Found Project: $PROJ_PATH"
 
+          # เคลียร์โฟลเดอร์ผลลัพธ์เก่า
           rm -rf ./build_output ./build
 
-          # ตั้ง Deployment Target เป็น iOS 15.0 และปิด Warnings เพื่อข้าม Compile Errors
+          # บิลด์ iOS แบบข้ามการตรวจสิทธิ์ Code Signing
           xcodebuild build \
             -project "$PROJ_PATH" \
             -scheme "3105" \
@@ -29,22 +39,21 @@ jobs:
             -configuration Release \
             -derivedDataPath ./build_output \
             IPHONEOS_DEPLOYMENT_TARGET=15.0 \
-            SWIFT_VERSION=5.0 \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY="" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            COMPILER_INDEX_STORE_ENABLE=NO
 
+          # ตรวจสอบไฟล์ .app
           APP_PATH=$(find ./build_output/Build/Products/Release-iphoneos -name "*.app" | head -n 1)
-          
           if [ -z "$APP_PATH" ]; then
-            echo "::error:: ไม่พบไฟล์ .app หลังบิลด์"
+            echo "::error:: ไม่พบไฟล์ .app หลังจากการบิลด์"
             exit 1
           fi
-
           echo "Found App: $APP_PATH"
 
-          # สร้างโครงสร้าง IPA ตามมาตรฐาน iOS
+          # แพ็กโครงสร้าง Payload สำหรับสร้าง IPA
           mkdir -p ./build/Payload
           cp -R "$APP_PATH" ./build/Payload/
           cd ./build
