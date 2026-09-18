@@ -16,22 +16,17 @@ jobs:
 
       - name: Build Unsigned App & Create IPA
         run: |
-          # 1. ค้นหาไฟล์ .xcodeproj ในโปรเจกต์
+          # 1. ค้นหาโปรเจกต์
           PROJ_PATH=$(find . -name "*.xcodeproj" | head -n 1)
           echo "Found Project: $PROJ_PATH"
 
-          # 2. ค้นหาชื่อ Scheme แรกที่พบ
-          SCHEME_NAME=$(xcodebuild -list -project "$PROJ_PATH" | grep -A 10 "Schemes:" | tail -n +2 | xargs | awk '{print $1}')
-          if [ -z "$SCHEME_NAME" ]; then SCHEME_NAME="UT"; fi
-          echo "Using Scheme: $SCHEME_NAME"
-
-          # 3. เคลียร์โฟลเดอร์ผลลัพธ์เก่า
+          # 2. ลบแคชบิลด์เก่า
           rm -rf ./build_output ./build
 
-          # 4. คำสั่งบิลด์ iOS แบบข้ามระบบ Code Signing ทั้งหมด
+          # 3. บิลด์โดยระบุ Scheme ให้ถูกต้อง (ThreeOneOSFive)
           xcodebuild build \
             -project "$PROJ_PATH" \
-            -scheme "$SCHEME_NAME" \
+            -scheme "ThreeOneOSFive" \
             -sdk iphoneos \
             -configuration Release \
             -derivedDataPath ./build_output \
@@ -41,24 +36,23 @@ jobs:
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
             COMPILER_INDEX_STORE_ENABLE=NO
 
-          # 5. ตรวจสอบว่าบิลด์ได้ไฟล์ .app หรือไม่
+          # 4. ตรวจสอบไฟล์ .app
           APP_PATH=$(find ./build_output/Build/Products/Release-iphoneos -name "*.app" | head -n 1)
           if [ -z "$APP_PATH" ]; then
-            echo "::error:: ไม่พบไฟล์ .app หลังจากการบิลด์"
+            echo "::error:: ไม่พบไฟล์ .app"
             exit 1
           fi
-          echo "Found App: $APP_PATH"
 
-          # 6. แพ็กไฟล์ .app เป็น Payload/ แล้วบีบอัดเป็น UT.ipa
+          # 5. ทำการ Zip เป็น IPA
           mkdir -p ./build/Payload
           cp -R "$APP_PATH" ./build/Payload/
           cd ./build
-          zip -r -q UT.ipa Payload
+          zip -r -q ThreeOneOSFive.ipa Payload
           cd ..
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: UT-IPA-Artifact
-          path: build/UT.ipa
+          name: ThreeOneOSFive-IPA
+          path: build/ThreeOneOSFive.ipa
